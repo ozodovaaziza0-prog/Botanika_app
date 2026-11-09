@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
-import { addons, addressSuggestions, HOLIDAYS, products, SLOTS, taxi } from '../data';
+import { addressSuggestions, HOLIDAYS, SLOTS, taxi } from '../data';
 import { Header } from '../components/Header';
 import { CardEditor } from '../components/CardEditor';
 import { cardOccasions, PERSONAL_OCCASIONS, recipients } from '../cardAssistant';
-import { unitPrice, useStore } from '../store';
+import { lineTitle, unitPrice, useStore } from '../store';
 import { money, pick } from '../i18n';
 import { haptic, requestPhone } from '../telegram';
 import { PROMO_CODES } from './Cart';
@@ -89,10 +89,8 @@ export function Checkout() {
       return;
     }
     const lines = cart.map((l) => {
-      const p = l.productId ? products.find((x) => x.id === l.productId) : null;
-      const a = l.addonId ? addons.find((x) => x.id === l.addonId) : null;
-      const v = p?.variants.find((x) => x.id === l.variantId);
-      return { title: p ? `${pick(lang, p.name)}, ${pick(lang, v!.label)}` : pick(lang, a!.name), qty: l.qty, price: unitPrice(l) };
+      const { title, sub } = lineTitle(l, lang);
+      return { title: `${title} (${sub})`, qty: l.qty, price: unitPrice(l) };
     });
     const dateLabel = day.d.toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'uz-UZ', { day: 'numeric', month: 'long' });
     const order = placeOrder({
@@ -154,7 +152,7 @@ export function Checkout() {
                     'После оплаты отправим получателю SMS со ссылкой: он сам выберет адрес и время. Не ответит — позвоним.',
                     "To'lovdan keyin qabul qiluvchiga havola bilan SMS yuboramiz: manzil va vaqtni o'zi tanlaydi. Javob bermasa — qo'ng'iroq qilamiz.",
                   )
-                : t('Сюрприз: получатель узнает о букете, только когда приедет курьер.', "Syurpriz: qabul qiluvchi guldasta haqida faqat kuryer kelganda biladi.")}
+                : t('Сюрприз: получатель узнает о цветах, только когда приедет курьер.', "Syurpriz: qabul qiluvchi gullar haqida faqat kuryer kelganda biladi.")}
             </div>
           </>
         )}
@@ -167,7 +165,7 @@ export function Checkout() {
           <button aria-pressed={pickup} onClick={() => setPickup(true)}>{t('Самовывоз · 0 сум', "Olib ketish · 0 so'm")}</button>
         </div>
         {pickup ? (
-          <p className="hint">{t('Заберите букет в магазине:', "Guldastani do'kondan oling:")} {SHOP_ADDRESS}</p>
+          <p className="hint">{t('Заберите цветы в магазине:', "Gullarni do'kondan oling:")} {SHOP_ADDRESS}</p>
         ) : gift && askAddress ? (
           <>
             <div className="info">
@@ -332,7 +330,7 @@ export function Checkout() {
       </div>
 
       <div className="panel">
-        <div className="sumrow"><span>{t('Букет и дополнения', "Guldasta va qo'shimchalar")}</span><span>{money(itemsTotal, lang)}</span></div>
+        <div className="sumrow"><span>{t('Цветы и дополнения', "Gullar va qo'shimchalar")}</span><span>{money(itemsTotal, lang)}</span></div>
         {discount > 0 && <div className="sumrow ok"><span>{t('Скидка по промокоду', 'Promokod chegirmasi')}</span><span>−{money(discount, lang)}</span></div>}
         <div className="sumrow">
           <span>{t('Доставка по тарифу такси', "Taksi tarifi bo'yicha yetkazish")}</span>

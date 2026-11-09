@@ -1,37 +1,57 @@
 // Тестовые данные прототипа. В рабочей версии всё это приходит из API и админки.
+// Модель: продаём не авторские букеты, а охапки одного вида цветов в коробке Botanika
+// и поштучные стебли для режима «Собери сам».
 
 export type Lang = 'ru' | 'uz';
 export type L10n = { ru: string; uz: string };
 
-export type FlowerKind = 'rose' | 'peony' | 'tulip' | 'chrys' | 'mix' | 'hydrangea';
-export type Wrap = 'paper' | 'box' | 'basket' | 'vase';
+export type FlowerKind =
+  | 'rose'
+  | 'spray'
+  | 'peony'
+  | 'tulip'
+  | 'chrys'
+  | 'ranunculus'
+  | 'eustoma'
+  | 'carnation'
+  | 'alstro'
+  | 'gyps'
+  | 'eucalyptus'
+  | 'hydrangea';
 
-export interface Variant {
+export interface Shade {
   id: string;
-  label: L10n;
-  price: number;
-  stems: number;
+  name: L10n;
+  hex: string;
+  /** второй тон для иллюстрации */
+  hex2?: string;
+  available: boolean;
 }
 
-export interface Product {
+export interface Flower {
   id: string;
-  category: string;
+  group: string; // фильтр-чип
   name: L10n;
-  composition: L10n;
-  variants: Variant[];
-  oldPrice?: number; // для первого варианта
-  badge?: 'hit' | 'new' | 'sale' | 'few';
-  left?: number;
-  sold: number;
+  latin?: string;
+  kind: FlowerKind;
+  shades: Shade[];
+  /** цена одного стебля в режиме «Собери сам» и в охапке минимального размера */
+  stemPrice: number;
+  /** размеры охапок в стеблях; скидка растёт с размером */
+  bunchSizes: number[];
+  bunchDiscount: number[]; // доля скидки на каждый размер
+  stemCm: number;
   lastsDays: [number, number];
   water: L10n;
+  note?: L10n; // «Важно знать»
   care: L10n;
-  colors: string[]; // палитра для иллюстрации
-  kind: FlowerKind;
-  wrap: Wrap;
-  occasions: string[];
-  available: boolean;
-  sizeCm: string;
+  sold: number; // стеблей продано
+  badge?: 'hit' | 'new' | 'season';
+  leftBunches?: number;
+  inBunches: boolean;
+  inDiy: boolean;
+  /** зелень и наполнители — в «Собери сам» показываем отдельным блоком */
+  filler?: boolean;
 }
 
 export interface Addon {
@@ -41,203 +61,279 @@ export interface Addon {
   emoji: string;
 }
 
-export const categories: { id: string; name: L10n }[] = [
+export const groups: { id: string; name: L10n }[] = [
   { id: 'all', name: { ru: 'Все', uz: 'Hammasi' } },
-  { id: 'author', name: { ru: 'Авторские', uz: 'Muallif guldastalari' } },
-  { id: 'mono', name: { ru: 'Монобукеты', uz: 'Monobuketlar' } },
   { id: 'roses', name: { ru: 'Розы', uz: 'Atirgullar' } },
-  { id: 'box', name: { ru: 'В коробке', uz: 'Qutida' } },
-  { id: 'basket', name: { ru: 'Корзины', uz: 'Savatlar' } },
+  { id: 'chrys', name: { ru: 'Хризантемы', uz: 'Xrizantemalar' } },
+  { id: 'peony', name: { ru: 'Пионы', uz: 'Pionlar' } },
+  { id: 'tulip', name: { ru: 'Тюльпаны', uz: 'Lolalar' } },
+  { id: 'other', name: { ru: 'Другие', uz: 'Boshqalar' } },
+  { id: 'green', name: { ru: 'Зелень', uz: "Ko'kat" } },
 ];
 
-export const occasions: { id: string; name: L10n }[] = [
-  { id: 'love', name: { ru: 'Любимой', uz: 'Sevimliga' } },
-  { id: 'mom', name: { ru: 'Маме', uz: 'Onaga' } },
-  { id: 'birthday', name: { ru: 'День рождения', uz: "Tug'ilgan kun" } },
-  { id: 'thanks', name: { ru: 'Спасибо', uz: 'Rahmat' } },
-  { id: 'office', name: { ru: 'Коллеге', uz: 'Hamkasbga' } },
-];
-
-const v = (id: string, ru: string, uz: string, price: number, stems: number): Variant => ({
+const sh = (id: string, ru: string, uz: string, hex: string, hex2?: string, available = true): Shade => ({
   id,
-  label: { ru, uz },
-  price,
-  stems,
+  name: { ru, uz },
+  hex,
+  hex2,
+  available,
 });
 
-const water7 = { ru: 'Свежая вода каждые 2 дня', uz: 'Har 2 kunda yangi suv' };
-const careStd = {
-  ru: 'Подрежьте стебли наискосок на 2 см, уберите листья ниже уровня воды, держите вдали от солнца и батарей.',
-  uz: "Poyalarni qiya qilib 2 sm kesing, suv ostidagi barglarni olib tashlang, quyosh va isitgichdan uzoqda saqlang.",
+const careStd: L10n = {
+  ru: 'Подрежьте стебли наискосок на 2 см острым ножом, уберите листья ниже уровня воды. Меняйте воду каждые 2 дня, держите вдали от солнца, батарей и фруктов.',
+  uz: "Poyalarni o'tkir pichoq bilan qiya qilib 2 sm kesing, suv ostidagi barglarni olib tashlang. Suvni har 2 kunda almashtiring, quyosh, isitgich va mevalardan uzoqda saqlang.",
 };
+const third: L10n = { ru: '⅓ стебля', uz: 'poyaning ⅓ qismi' };
+const half: L10n = { ru: '½ стебля', uz: 'poyaning ½ qismi' };
+const little: L10n = { ru: '5–7 см воды', uz: '5–7 sm suv' };
 
-export const products: Product[] = [
+export const flowers: Flower[] = [
   {
-    id: 'p1',
-    category: 'author',
-    name: { ru: 'Утро в Чиланзаре', uz: 'Chilonzorda tong' },
-    composition: { ru: 'Кустовая роза, эустома, ранункулюс, эвкалипт', uz: "Shoxli atirgul, eustoma, ranunkulus, evkalipt" },
-    variants: [v('s', 'S', 'S', 390000, 11), v('m', 'M', 'M', 520000, 17), v('l', 'L', 'L', 690000, 25)],
-    badge: 'hit',
-    sold: 412,
-    lastsDays: [6, 9],
-    water: water7,
-    care: careStd,
-    colors: ['#F2C7CF', '#E89AAE', '#FFF4EC', '#9DB7A5'],
-    kind: 'mix',
-    wrap: 'paper',
-    occasions: ['love', 'birthday', 'mom'],
-    available: true,
-    sizeCm: '45 × 35',
-  },
-  {
-    id: 'p2',
-    category: 'roses',
-    name: { ru: 'Розы Кения', uz: 'Keniya atirgullari' },
-    composition: { ru: 'Роза Кения 40 см', uz: 'Keniya atirguli 40 sm' },
-    variants: [v('15', '15 шт', '15 dona', 285000, 15), v('25', '25 шт', '25 dona', 450000, 25), v('51', '51 шт', '51 dona', 890000, 51)],
-    oldPrice: 320000,
-    badge: 'sale',
-    sold: 2380,
-    lastsDays: [7, 10],
-    water: { ru: 'Вода на ⅓ стебля', uz: "Poyaning ⅓ qismigacha suv" },
-    care: careStd,
-    colors: ['#C8304F', '#A8233F', '#E0566F'],
-    kind: 'rose',
-    wrap: 'paper',
-    occasions: ['love', 'birthday'],
-    available: true,
-    sizeCm: '40 × 30',
-  },
-  {
-    id: 'p3',
-    category: 'mono',
-    name: { ru: 'Пионы Сара Бернар', uz: 'Sara Bernar pionlari' },
-    composition: { ru: 'Пион Сара Бернар', uz: 'Sara Bernar pioni' },
-    variants: [v('7', '7 шт', '7 dona', 420000, 7), v('15', '15 шт', '15 dona', 850000, 15)],
-    badge: 'few',
-    left: 3,
-    sold: 186,
-    lastsDays: [4, 6],
-    water: { ru: 'Много воды, раскрываются за сутки', uz: "Ko'p suv, bir kunda ochiladi" },
-    care: careStd,
-    colors: ['#F6C9D3', '#EDA6B8', '#FBE2E8'],
-    kind: 'peony',
-    wrap: 'paper',
-    occasions: ['love', 'mom'],
-    available: true,
-    sizeCm: '40 × 35',
-  },
-  {
-    id: 'p4',
-    category: 'mono',
-    name: { ru: 'Тюльпаны микс', uz: 'Lolalar miks' },
-    composition: { ru: 'Тюльпаны трёх цветов', uz: 'Uch rangli lolalar' },
-    variants: [v('25', '25 шт', '25 dona', 260000, 25), v('51', '51 шт', '51 dona', 510000, 51)],
-    badge: 'new',
-    sold: 97,
-    lastsDays: [5, 7],
-    water: { ru: 'Холодная вода, немного', uz: 'Ozgina sovuq suv' },
-    care: careStd,
-    colors: ['#F7B43C', '#E8667A', '#FFFFFF'],
-    kind: 'tulip',
-    wrap: 'paper',
-    occasions: ['mom', 'office', 'thanks'],
-    available: true,
-    sizeCm: '45 × 30',
-  },
-  {
-    id: 'p5',
-    category: 'box',
-    name: { ru: 'Шляпная коробка «Нежность»', uz: "«Nafislik» quti" },
-    composition: { ru: 'Роза, гвоздика, гипсофила в коробке', uz: "Atirgul, chinnigul, gipsofila qutida" },
-    variants: [v('m', 'M', 'M', 480000, 21), v('l', 'L', 'L', 640000, 31)],
-    sold: 264,
-    lastsDays: [7, 12],
-    water: { ru: 'Поливайте губку раз в 2 дня', uz: "Gubkani har 2 kunda sug'oring" },
-    care: { ru: 'Не доставайте цветы — они стоят во влажной флористической губке.', uz: "Gullarni chiqarmang — ular nam gubkada turadi." },
-    colors: ['#F4D3DA', '#FFFFFF', '#E7B1BF'],
-    kind: 'mix',
-    wrap: 'box',
-    occasions: ['love', 'mom', 'birthday'],
-    available: true,
-    sizeCm: '25 × 25',
-  },
-  {
-    id: 'p6',
-    category: 'author',
-    name: { ru: 'Сад Мирабада', uz: "Mirobod bog'i" },
-    composition: { ru: 'Гортензия, роза, маттиола, зелень', uz: "Gortenziya, atirgul, mattiola, ko'kat" },
-    variants: [v('m', 'M', 'M', 610000, 15), v('l', 'L', 'L', 820000, 21)],
-    sold: 151,
-    lastsDays: [5, 8],
-    water: water7,
-    care: careStd,
-    colors: ['#B9C6E8', '#8EA2D6', '#F1E9F5', '#9DB7A5'],
-    kind: 'hydrangea',
-    wrap: 'paper',
-    occasions: ['mom', 'thanks', 'birthday'],
-    available: true,
-    sizeCm: '50 × 40',
-  },
-  {
-    id: 'p7',
-    category: 'mono',
+    id: 'chrys-spray',
+    group: 'chrys',
     name: { ru: 'Хризантема кустовая', uz: 'Shoxli xrizantema' },
-    composition: { ru: 'Хризантема кустовая', uz: 'Shoxli xrizantema' },
-    variants: [v('9', '9 шт', '9 dona', 210000, 9), v('15', '15 шт', '15 dona', 330000, 15)],
-    sold: 640,
-    lastsDays: [10, 20],
-    water: { ru: 'Вода на ⅓ стебля', uz: "Poyaning ⅓ qismigacha suv" },
-    care: careStd,
-    colors: ['#F2E9D0', '#E9D79C', '#FFFFFF'],
+    latin: 'Chrysanthemum',
     kind: 'chrys',
-    wrap: 'paper',
-    occasions: ['office', 'thanks', 'mom'],
-    available: true,
-    sizeCm: '45 × 35',
-  },
-  {
-    id: 'p8',
-    category: 'basket',
-    name: { ru: 'Корзина «Праздник»', uz: "«Bayram» savati" },
-    composition: { ru: 'Роза, хризантема, альстромерия, зелень', uz: "Atirgul, xrizantema, alstromeriya, ko'kat" },
-    variants: [v('m', 'M', 'M', 750000, 35), v('l', 'L', 'L', 1150000, 55)],
-    sold: 73,
-    lastsDays: [7, 10],
-    water: { ru: 'Поливайте губку раз в 2 дня', uz: "Gubkani har 2 kunda sug'oring" },
-    care: { ru: 'Корзина стоит во влажной губке — доливайте воду в центр.', uz: "Savat nam gubkada turadi — o'rtasiga suv qo'shing." },
-    colors: ['#F28C5B', '#F6C35B', '#E8667A', '#9DB7A5'],
-    kind: 'mix',
-    wrap: 'basket',
-    occasions: ['birthday', 'office', 'thanks'],
-    available: true,
-    sizeCm: '55 × 45',
-  },
-  {
-    id: 'p9',
-    category: 'roses',
-    name: { ru: 'Белые розы Аваланш', uz: 'Oq atirgullar Avalansh' },
-    composition: { ru: 'Роза Аваланш 60 см', uz: 'Avalansh atirguli 60 sm' },
-    variants: [v('11', '11 шт', '11 dona', 330000, 11), v('25', '25 шт', '25 dona', 720000, 25)],
-    sold: 302,
-    lastsDays: [8, 12],
-    water: { ru: 'Вода на ⅓ стебля', uz: "Poyaning ⅓ qismigacha suv" },
+    shades: [sh('white', 'Белая', 'Oq', '#F7F4EA', '#E9D79C'), sh('pink', 'Розовая', 'Pushti', '#EDB3C4', '#D98BA3'), sh('yellow', 'Жёлтая', 'Sariq', '#F3D66B', '#E2B93B'), sh('lilac', 'Сиреневая', 'Siren', '#C9A6D8', '#A985BE')],
+    stemPrice: 22000,
+    bunchSizes: [9, 15, 25],
+    bunchDiscount: [0, 0.05, 0.1],
+    stemCm: 60,
+    lastsDays: [10, 20],
+    water: third,
+    note: { ru: 'Самые стойкие: на одной ветке 5–8 соцветий, они раскрываются не одновременно.', uz: "Eng chidamli: bitta shoxda 5–8 ta gul, ular bir vaqtda ochilmaydi." },
     care: careStd,
-    colors: ['#FFFFFF', '#F3F0E6', '#E8E4D6'],
+    sold: 4820,
+    badge: 'hit',
+    leftBunches: undefined,
+    inBunches: true,
+    inDiy: true,
+  },
+  {
+    id: 'rose-kenya',
+    group: 'roses',
+    name: { ru: 'Роза Кения', uz: 'Keniya atirguli' },
+    latin: 'Rosa',
     kind: 'rose',
-    wrap: 'paper',
-    occasions: ['love', 'office'],
-    available: false,
-    sizeCm: '60 × 30',
+    shades: [sh('red', 'Красная', 'Qizil', '#C8304F', '#9E2038'), sh('pink', 'Розовая', 'Pushti', '#EE9BB1', '#D86F8D'), sh('white', 'Белая', 'Oq', '#FBF7EF', '#E6DFCF'), sh('peach', 'Персиковая', 'Shaftoli', '#F6BE9A', '#E89D74')],
+    stemPrice: 19000,
+    bunchSizes: [15, 25, 51],
+    bunchDiscount: [0, 0.05, 0.12],
+    stemCm: 40,
+    lastsDays: [7, 10],
+    water: third,
+    care: careStd,
+    sold: 12940,
+    inBunches: true,
+    inDiy: true,
+  },
+  {
+    id: 'rose-spray',
+    group: 'roses',
+    name: { ru: 'Роза кустовая', uz: 'Shoxli atirgul' },
+    latin: 'Rosa',
+    kind: 'spray',
+    shades: [sh('blush', 'Пудровая', 'Pudra', '#F4CDD4', '#E7AAB7'), sh('cream', 'Кремовая', 'Krem', '#F6EBD4', '#E8D5AE'), sh('hot', 'Малиновая', 'Malina', '#D9467A', '#B32E5E')],
+    stemPrice: 26000,
+    bunchSizes: [9, 15, 25],
+    bunchDiscount: [0, 0.05, 0.1],
+    stemCm: 50,
+    lastsDays: [7, 10],
+    water: third,
+    note: { ru: 'На каждой ветке 4–7 бутонов — охапка выглядит пышнее, чем кажется по числу стеблей.', uz: "Har shoxda 4–7 g'uncha — guldasta poyalar sonidan ko'ra hajmliroq ko'rinadi." },
+    care: careStd,
+    sold: 3210,
+    inBunches: true,
+    inDiy: true,
+  },
+  {
+    id: 'peony',
+    group: 'peony',
+    name: { ru: 'Пион Сара Бернар', uz: 'Sara Bernar pioni' },
+    latin: 'Paeonia',
+    kind: 'peony',
+    shades: [sh('pink', 'Розовый', 'Pushti', '#F3C2CF', '#E59AB0'), sh('white', 'Белый', 'Oq', '#FBF4F0', '#EFDCD3'), sh('coral', 'Коралловый', 'Marjon', '#F2977F', '#E0735B', false)],
+    stemPrice: 65000,
+    bunchSizes: [5, 9, 15],
+    bunchDiscount: [0, 0.05, 0.08],
+    stemCm: 50,
+    lastsDays: [4, 6],
+    water: half,
+    note: { ru: 'Приезжают бутонами и раскрываются за сутки в тёплой воде.', uz: "G'uncha holida keladi va iliq suvda bir kunda ochiladi." },
+    care: careStd,
+    sold: 960,
+    badge: 'season',
+    leftBunches: 3,
+    inBunches: true,
+    inDiy: true,
+  },
+  {
+    id: 'tulip',
+    group: 'tulip',
+    name: { ru: 'Тюльпан', uz: 'Lola' },
+    latin: 'Tulipa',
+    kind: 'tulip',
+    shades: [sh('yellow', 'Жёлтый', 'Sariq', '#F6C343', '#E3A51E'), sh('pink', 'Розовый', 'Pushti', '#EE8FA6', '#D96884'), sh('white', 'Белый', 'Oq', '#FBF9F2', '#E5E1D2'), sh('red', 'Красный', 'Qizil', '#D63A3A', '#B02626')],
+    stemPrice: 11000,
+    bunchSizes: [15, 25, 51],
+    bunchDiscount: [0, 0.05, 0.1],
+    stemCm: 40,
+    lastsDays: [5, 7],
+    water: little,
+    note: { ru: 'Тюльпаны тянутся к свету и растут в вазе — подрезайте раз в 2 дня.', uz: "Lolalar yorug'likka intiladi va guldonda o'sadi — har 2 kunda kesib turing." },
+    care: careStd,
+    sold: 7400,
+    badge: 'new',
+    inBunches: true,
+    inDiy: true,
+  },
+  {
+    id: 'ranunculus',
+    group: 'other',
+    name: { ru: 'Ранункулюс', uz: 'Ranunkulus' },
+    latin: 'Ranunculus',
+    kind: 'ranunculus',
+    shades: [sh('peach', 'Персиковый', 'Shaftoli', '#F7B993', '#E9946A'), sh('white', 'Белый', 'Oq', '#FBF6EE', '#EADFCC'), sh('pink', 'Розовый', 'Pushti', '#F2A7B9', '#DD7F97')],
+    stemPrice: 28000,
+    bunchSizes: [9, 15],
+    bunchDiscount: [0, 0.06],
+    stemCm: 40,
+    lastsDays: [6, 9],
+    water: little,
+    care: careStd,
+    sold: 1280,
+    inBunches: true,
+    inDiy: true,
+  },
+  {
+    id: 'eustoma',
+    group: 'other',
+    name: { ru: 'Эустома', uz: 'Eustoma' },
+    latin: 'Eustoma',
+    kind: 'eustoma',
+    shades: [sh('white', 'Белая', 'Oq', '#FAF8F2', '#E7E2D2'), sh('lilac', 'Лиловая', 'Binafsha', '#B79AD6', '#9677BE'), sh('green', 'Зеленоватая', 'Yashilroq', '#E4EDCF', '#C9D9A6')],
+    stemPrice: 24000,
+    bunchSizes: [9, 15],
+    bunchDiscount: [0, 0.06],
+    stemCm: 60,
+    lastsDays: [8, 12],
+    water: third,
+    care: careStd,
+    sold: 2050,
+    inBunches: true,
+    inDiy: true,
+  },
+  {
+    id: 'carnation',
+    group: 'other',
+    name: { ru: 'Гвоздика', uz: 'Chinnigul' },
+    latin: 'Dianthus',
+    kind: 'carnation',
+    shades: [sh('pink', 'Розовая', 'Pushti', '#F0A8BB', '#DD8199'), sh('white', 'Белая', 'Oq', '#FAF7F1', '#E6DECF'), sh('burgundy', 'Бордовая', 'Bordo', '#8E2440', '#6E1730')],
+    stemPrice: 12000,
+    bunchSizes: [15, 25],
+    bunchDiscount: [0, 0.06],
+    stemCm: 60,
+    lastsDays: [10, 14],
+    water: third,
+    care: careStd,
+    sold: 3900,
+    inBunches: true,
+    inDiy: true,
+  },
+  {
+    id: 'alstro',
+    group: 'other',
+    name: { ru: 'Альстромерия', uz: 'Alstromeriya' },
+    latin: 'Alstroemeria',
+    kind: 'alstro',
+    shades: [sh('mix', 'Микс', 'Miks', '#F2A35E', '#E8667A'), sh('white', 'Белая', 'Oq', '#FAF6EE', '#E7DCC8')],
+    stemPrice: 16000,
+    bunchSizes: [10, 20],
+    bunchDiscount: [0, 0.06],
+    stemCm: 60,
+    lastsDays: [10, 14],
+    water: third,
+    care: careStd,
+    sold: 1460,
+    inBunches: true,
+    inDiy: true,
+  },
+  {
+    id: 'hydrangea',
+    group: 'other',
+    name: { ru: 'Гортензия', uz: 'Gortenziya' },
+    latin: 'Hydrangea',
+    kind: 'hydrangea',
+    shades: [sh('blue', 'Голубая', 'Havorang', '#A9BCE6', '#8098D2'), sh('white', 'Белая', 'Oq', '#F4F6F0', '#DDE3D3')],
+    stemPrice: 55000,
+    bunchSizes: [3, 5],
+    bunchDiscount: [0, 0.05],
+    stemCm: 50,
+    lastsDays: [5, 8],
+    water: half,
+    note: { ru: 'Любит много воды: если голова поникла — опустите её в воду на час.', uz: "Ko'p suv yoqtiradi: boshi egilsa — bir soatga suvga botiring." },
+    care: careStd,
+    sold: 610,
+    inBunches: true,
+    inDiy: true,
+  },
+  {
+    id: 'gyps',
+    group: 'green',
+    name: { ru: 'Гипсофила', uz: 'Gipsofila' },
+    kind: 'gyps',
+    shades: [sh('white', 'Белая', 'Oq', '#FFFFFF', '#E9ECE4')],
+    stemPrice: 18000,
+    bunchSizes: [3, 5],
+    bunchDiscount: [0, 0.05],
+    stemCm: 60,
+    lastsDays: [7, 12],
+    water: third,
+    care: careStd,
+    sold: 1840,
+    inBunches: true,
+    inDiy: true,
+    filler: true,
+  },
+  {
+    id: 'eucalyptus',
+    group: 'green',
+    name: { ru: 'Эвкалипт', uz: 'Evkalipt' },
+    kind: 'eucalyptus',
+    shades: [sh('green', 'Серебристый', 'Kumushrang', '#9DB7A5', '#7E9C8A')],
+    stemPrice: 14000,
+    bunchSizes: [5, 9],
+    bunchDiscount: [0, 0.05],
+    stemCm: 60,
+    lastsDays: [10, 20],
+    water: third,
+    care: careStd,
+    sold: 2200,
+    inBunches: true,
+    inDiy: true,
+    filler: true,
   },
 ];
+
+export const flowerById = (id: string) => flowers.find((f) => f.id === id)!;
+export const shadeOf = (f: Flower, shadeId: string) => f.shades.find((s) => s.id === shadeId) ?? f.shades[0];
+
+/** Цена охапки: стебли × цена стебля, со скидкой за размер, округление до 1 000 сум. */
+export function bunchPrice(f: Flower, stems: number) {
+  const i = f.bunchSizes.indexOf(stems);
+  const d = i >= 0 ? f.bunchDiscount[i] : 0;
+  return Math.round((stems * f.stemPrice * (1 - d)) / 1000) * 1000;
+}
+
+/** «Собери сам»: минимальная сумма и максимум стеблей в одной коробке. */
+export const DIY = { minSum: 150000, maxStems: 41, boxPrice: 0 };
 
 export const addons: Addon[] = [
   { id: 'a1', name: { ru: 'Ваза стеклянная', uz: 'Shisha guldon' }, price: 95000, emoji: '🫙' },
-  { id: 'a2', name: { ru: 'Шары, 3 шт', uz: 'Sharlar, 3 dona' }, price: 60000, emoji: '🎈' },
+  { id: 'a2', name: { ru: 'Подкормка для цветов', uz: "Gullar uchun o'g'it" }, price: 8000, emoji: '🧪' },
   { id: 'a3', name: { ru: 'Конфеты Raffaello', uz: 'Raffaello konfetlari' }, price: 75000, emoji: '🍬' },
-  { id: 'a4', name: { ru: 'Мягкий мишка', uz: 'Yumshoq ayiqcha' }, price: 120000, emoji: '🧸' },
+  { id: 'a4', name: { ru: 'Секатор', uz: 'Sekator' }, price: 65000, emoji: '✂️' },
 ];
 
 // Тестовые адреса вместо подсказок карт (в рабочей версии — Google Maps / 2ГИС)

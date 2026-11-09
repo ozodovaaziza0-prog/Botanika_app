@@ -1,13 +1,13 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
-import { addons, products, type Lang, type L10n } from './data';
+import { addons, bunchPrice, flowerById, shadeOf, type Lang, type L10n } from './data';
 import { tgUser } from './telegram';
 
 export type Screen =
   | { name: 'catalog' }
   | { name: 'product'; id: string }
+  | { name: 'diy' }
   | { name: 'cart' }
   | { name: 'checkout' }
-  | { name: 'card' }
   | { name: 'pay'; orderId: string }
   | { name: 'success'; orderId: string }
   | { name: 'orders' }
@@ -17,12 +17,41 @@ export type Screen =
 
 export type Tab = 'catalog' | 'cart' | 'orders' | 'profile';
 
-export interface CartLine {
-  key: string;
-  productId?: string;
-  variantId?: string;
-  addonId?: string;
+export interface DiyItem {
+  flowerId: string;
+  shadeId: string;
   qty: number;
+}
+
+/** Строка корзины: охапка одного вида, своя охапка «Собери сам» или дополнение. */
+export type NewLine =
+  | { type: 'bunch'; flowerId: string; shadeId: string; stems: number }
+  | { type: 'diy'; items: DiyItem[] }
+  | { type: 'addon'; addonId: string };
+export type CartLine = NewLine & { key: string; qty: number };
+
+export const lineKey = (l: NewLine) =>
+  l.type === 'bunch' ? `b:${l.flowerId}:${l.shadeId}:${l.stems}` : l.type === 'addon' ? `a:${l.addonId}` : `d:${Date.now()}`;
+
+export const diyTotal = (items: DiyItem[]) => items.reduce((s, i) => s + flowerById(i.flowerId).stemPrice * i.qty, 0);
+export const diyStems = (items: DiyItem[]) => items.reduce((s, i) => s + i.qty, 0);
+
+export function lineTitle(l: NewLine, lang: Lang): { title: string; sub: string } {
+  if (l.type === 'addon') {
+    const a = addons.find((x) => x.id === l.addonId)!;
+    return { title: a.name[lang], sub: lang === 'ru' ? 'Дополнение' : "Qo'shimcha" };
+  }
+  if (l.type === 'bunch') {
+    const f = flowerById(l.flowerId);
+    return {
+      title: `${lang === 'ru' ? 'Охапка' : 'Quchoq'}: ${f.name[lang]}`,
+      sub: `${shadeOf(f, l.shadeId).name[lang]} · ${l.stems} ${lang === 'ru' ? 'шт' : 'dona'}`,
+    };
+  }
+  return {
+    title: lang === 'ru' ? 'Своя охапка' : "O'z quchog'im",
+    sub: l.items.map((i) => `${flowerById(i.flowerId).name[lang]} × ${i.qty}`).join(', '),
+  };
 }
 
 export interface CardState {
@@ -66,10 +95,10 @@ export interface Order {
   status: OrderStatus;
 }
 
-export const unitPrice = (l: CartLine) => {
-  if (l.addonId) return addons.find((a) => a.id === l.addonId)!.price;
-  const p = products.find((x) => x.id === l.productId)!;
-  return p.variants.find((v) => v.id === l.variantId)!.price;
+export const unitPrice = (l: NewLine) => {
+  if (l.type === 'addon') return addons.find((a) => a.id === l.addonId)!.price;
+  if (l.type === 'bunch') return bunchPrice(flowerById(l.flowerId), l.stems);
+  return diyTotal(l.items);
 };
 
 interface Store {
@@ -83,7 +112,10 @@ interface Store {
   tab: Tab;
   setTab: (t: Tab) => void;
   cart: CartLine[];
-  add: (l: Omit<CartLine, 'key' | 'qty'>, qty?: number) => void;
+  add: (l: NewLine, qty?: number) => void;
+  diy: Record<string, number>;
+  setDiy: (key: string, qty: number) => void;
+  clearDiy: () => void;
   setQty: (key: string, qty: number) => void;
   cartCount: number;
   itemsTotal: number;
@@ -120,6 +152,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [stack, setStack] = useState<Screen[]>([{ name: 'catalog' }]);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [promo, setPromo] = useState<string | null>(null);
+  const [diy, setDiyState] = useState<Record<string, number>>({});
   const [card, setCardState] = useState<CardState>({
     text: '',
     to: '',
@@ -138,7 +171,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const store = useMemo<Store>(() => {
     const t = (v: L10n | string, uz?: string) => (typeof v === 'string' ? (lang === 'uz' && uz ? uz : v) : v[lang]);
-    const cartCount = cart.reduce((s, l) => s + (l.productId ? l.qty : 0), 0);
+    const cartCount = cart.reduce((s, l) => s + (l.type !== 'addon' ? l.qty : 0), 0);
     const itemsTotal = cart.reduce((s, l) => s + unitPrice(l) * l.qty, 0);
     return {
       lang,
@@ -160,11 +193,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       cart,
       add: (l, qty = 1) =>
         setCart((c) => {
-          const key = l.addonId ?? `${l.productId}:${l.variantId}`;
+          const key = lineKey(l);
           const ex = c.find((x) => x.key === key);
           if (ex) return c.map((x) => (x.key === key ? { ...x, qty: x.qty + qty } : x));
-          return [...c, { ...l, key, qty }];
+          return [...c, { ...l, key, qty } as CartLine];
         }),
+      diy,
+      setDiy: (k, q) => setDiyState((d) => { const n = { ...d }; if (q <= 0) delete n[k]; else n[k] = q; return n; }),
+      clearDiy: () => setDiyState({}),
       setQty: (key, qty) => setCart((c) => (qty <= 0 ? c.filter((x) => x.key !== key) : c.map((x) => (x.key === key ? { ...x, qty } : x)))),
       cartCount,
       itemsTotal,
@@ -198,7 +234,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       waitlist,
       setWaitlist,
     };
-  }, [lang, stack, tab, cart, promo, card, user, orders, savedDates, waitlist]);
+  }, [lang, stack, tab, cart, diy, promo, card, user, orders, savedDates, waitlist]);
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }

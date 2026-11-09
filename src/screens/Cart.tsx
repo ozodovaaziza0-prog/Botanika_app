@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { addons, products } from '../data';
+import { addons, flowerById } from '../data';
 import { FlowerArt } from '../components/FlowerArt';
 import { Header } from '../components/Header';
-import { unitPrice, useStore } from '../store';
+import { diyArt, bunchArt } from '../components/art';
+import { lineTitle, unitPrice, useStore } from '../store';
 import { money, pick, tr } from '../i18n';
 
 export const PROMO_CODES: Record<string, number> = { BOTANIKA10: 0.1 };
@@ -12,7 +13,7 @@ export function Cart() {
   const [code, setCode] = useState(promo ?? '');
   const [promoErr, setPromoErr] = useState(false);
   const discount = promo ? Math.round(itemsTotal * (PROMO_CODES[promo] ?? 0)) : 0;
-  const hasBouquet = cart.some((l) => l.productId);
+  const hasBouquet = cart.some((l) => l.type !== 'addon');
 
   if (cart.length === 0) {
     return (
@@ -40,24 +41,28 @@ export function Cart() {
     }
   };
 
-  const missingAddons = addons.filter((a) => !cart.some((l) => l.addonId === a.id)).slice(0, 3);
+  const missingAddons = addons.filter((a) => !cart.some((l) => l.type === 'addon' && l.addonId === a.id)).slice(0, 3);
 
   return (
     <>
       <Header title={tr(lang, 'cart')} />
       <div className="panel">
         {cart.map((l) => {
-          const p = l.productId ? products.find((x) => x.id === l.productId)! : null;
-          const v = p?.variants.find((x) => x.id === l.variantId);
-          const a = l.addonId ? addons.find((x) => x.id === l.addonId)! : null;
+          const { title, sub } = lineTitle(l, lang);
           return (
             <div className="line" key={l.key}>
               <div className="thumb">
-                {p && v ? <FlowerArt seed={p.id} kind={p.kind} wrap={p.wrap} colors={p.colors} stems={v.stems} /> : <span aria-hidden="true">{a?.emoji}</span>}
+                {l.type === 'bunch' ? (
+                  <FlowerArt seed={l.key} stems={bunchArt(flowerById(l.flowerId), l.shadeId, l.stems)} pack="box" />
+                ) : l.type === 'diy' ? (
+                  <FlowerArt seed={l.key} stems={diyArt(l.items)} pack="vase" />
+                ) : (
+                  <span aria-hidden="true">{addons.find((a) => a.id === l.addonId)?.emoji}</span>
+                )}
               </div>
               <div className="grow">
-                <div className="t">{p ? pick(lang, p.name) : a && pick(lang, a.name)}</div>
-                <div className="s">{v ? pick(lang, v.label) : t('Дополнение', "Qo'shimcha")}</div>
+                <div className="t">{title}</div>
+                <div className="s">{sub}</div>
                 <div className="mini-step">
                   <button aria-label={t('Меньше', 'Kamroq')} onClick={() => setQty(l.key, l.qty - 1)}>−</button>
                   <span>{l.qty}</span>
@@ -75,7 +80,7 @@ export function Cart() {
           <h2>{t('Часто добавляют', "Ko'pincha qo'shishadi")}</h2>
           <div className="addons">
             {missingAddons.map((a) => (
-              <button key={a.id} className="addon" onClick={() => add({ addonId: a.id })}>
+              <button key={a.id} className="addon" onClick={() => add({ type: 'addon', addonId: a.id })}>
                 <div className="em" aria-hidden="true">{a.emoji}</div>
                 <div className="nm">{pick(lang, a.name)}</div>
                 <div className="pr">+{money(a.price, lang)}</div>
@@ -113,7 +118,7 @@ export function Cart() {
       <div className="dock">
         <div className="dock-in">
           <button className="btn" disabled={!hasBouquet} onClick={() => go({ name: 'checkout' })}>
-            {hasBouquet ? tr(lang, 'checkout') : t('Добавьте букет — дополнения не продаём отдельно', "Guldasta qo'shing — qo'shimchalar alohida sotilmaydi")}
+            {hasBouquet ? tr(lang, 'checkout') : t('Добавьте цветы — дополнения не продаём отдельно', "Gul qo'shing — qo'shimchalar alohida sotilmaydi")}
           </button>
         </div>
       </div>

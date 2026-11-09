@@ -75,12 +75,12 @@ export function RecipientLink({ orderId }: { orderId: string }) {
   const [done, setDone] = useState(false);
   return (
     <>
-      <Header title={t('Вам букет', 'Sizga guldasta')} />
+      <Header title={t('Вам цветы', 'Sizga gullar')} />
       {done ? (
         <div className="center">
           <div className="big-ok" aria-hidden="true">✓</div>
           <h1>{t('Спасибо!', 'Rahmat!')}</h1>
-          <p className="muted">{t('Курьер привезёт букет в выбранное время.', 'Kuryer guldastani tanlangan vaqtda olib keladi.')}</p>
+          <p className="muted">{t('Курьер привезёт цветы в выбранное время.', 'Kuryer gullarni tanlangan vaqtda olib keladi.')}</p>
         </div>
       ) : (
         <>

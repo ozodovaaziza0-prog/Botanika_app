@@ -6,7 +6,7 @@ import { haptic } from '../telegram';
 const STEPS: { id: OrderStatus; ru: string; uz: string }[] = [
   { id: 'paid', ru: 'Оплачен', uz: "To'langan" },
   { id: 'accepted', ru: 'Принят магазином', uz: "Do'kon qabul qildi" },
-  { id: 'assembling', ru: 'Флорист собирает букет', uz: "Florist guldastani yig'moqda" },
+  { id: 'assembling', ru: 'Флорист собирает охапку', uz: "Florist quchoqni yig'moqda" },
   { id: 'ready', ru: 'Собран — фото отправили вам', uz: "Tayyor — rasmini yubordik" },
   { id: 'courier', ru: 'Курьер в пути', uz: "Kuryer yo'lda" },
   { id: 'delivered', ru: 'Доставлен', uz: 'Yetkazildi' },
@@ -59,8 +59,8 @@ export function Success({ orderId }: { orderId: string }) {
           {o.askRecipient && (
             <li className="now"><span className="b" /><span>{t('Получатель получит SMS и выберет адрес и время', 'Qabul qiluvchi SMS oladi va manzil hamda vaqtni tanlaydi')}</span></li>
           )}
-          <li className="todo"><span className="b" /><span>{t('Перед доставкой пришлём в этот чат фото букета', 'Yetkazishdan oldin guldasta rasmini shu chatga yuboramiz')}</span></li>
-          <li className="todo"><span className="b" /><span>{t('Напишем, когда курьер выедет и когда букет вручат', 'Kuryer chiqqanda va guldasta topshirilganda yozamiz')}</span></li>
+          <li className="todo"><span className="b" /><span>{t('Перед доставкой пришлём в этот чат фото охапки', "Yetkazishdan oldin quchoq rasmini shu chatga yuboramiz")}</span></li>
+          <li className="todo"><span className="b" /><span>{t('Напишем, когда курьер выедет и когда цветы вручат', 'Kuryer chiqqanda va gullar topshirilganda yozamiz')}</span></li>
         </ul>
       </div>
       {o.askRecipient && (
@@ -88,8 +88,8 @@ export function Orders() {
         <Header title={t('Заказы', 'Buyurtmalar')} />
         <div className="empty">
           <h2>{t('Заказов пока нет', "Hozircha buyurtmalar yo'q")}</h2>
-          <p>{t('Здесь будут статусы и фото ваших букетов.', 'Bu yerda guldastalaringiz holati va rasmlari bo‘ladi.')}</p>
-          <button className="btn" onClick={() => setTab('catalog')}>{t('Выбрать букет', 'Guldasta tanlash')}</button>
+          <p>{t('Здесь будут статусы и фото ваших охапок.', 'Bu yerda quchoqlaringiz holati va rasmlari bo‘ladi.')}</p>
+          <button className="btn" onClick={() => setTab('catalog')}>{t('Выбрать цветы', 'Gul tanlash')}</button>
         </div>
       </>
     );
@@ -142,7 +142,7 @@ export function OrderDetail({ id }: { id: string }) {
       {o.status === 'delivered' && (
         <div className="dock no-tabs">
           <div className="dock-in">
-            <button className="btn" onClick={() => { o.cartLines.forEach((l) => add({ productId: l.productId, variantId: l.variantId, addonId: l.addonId }, l.qty)); setTab('cart'); }}>
+            <button className="btn" onClick={() => { o.cartLines.forEach(({ key: _k, qty, ...l }) => add(l, qty)); setTab('cart'); }}>
               {t('Повторить заказ', 'Buyurtmani takrorlash')}
             </button>
           </div>

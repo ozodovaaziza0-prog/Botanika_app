@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useStore, type Tab } from './store';
 import { Catalog } from './screens/Catalog';
 import { Product } from './screens/Product';
+import { Diy } from './screens/Diy';
 import { Cart } from './screens/Cart';
 import { Checkout } from './screens/Checkout';
 import { OrderDetail, Orders, Pay, Success } from './screens/Orders';
@@ -29,13 +30,14 @@ export function App() {
     tg.BackButton.hide();
   }, [stack, back]);
 
-  const hideTabs = ['checkout', 'pay', 'success', 'recipient', 'order'].includes(screen.name);
+  const hideTabs = ['checkout', 'pay', 'success', 'recipient', 'order', 'diy'].includes(screen.name);
   const activeOrders = orders.filter((o) => o.status !== 'delivered').length;
 
   let body: JSX.Element;
   switch (screen.name) {
     case 'catalog': body = <Catalog />; break;
     case 'product': body = <Product id={screen.id} key={screen.id} />; break;
+    case 'diy': body = <Diy />; break;
     case 'cart': body = <Cart />; break;
     case 'checkout': body = <Checkout />; break;
     case 'pay': body = <Pay orderId={screen.orderId} />; break;
